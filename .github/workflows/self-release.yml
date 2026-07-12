@@ -1,0 +1,15 @@
+name: self-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
