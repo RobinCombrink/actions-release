@@ -33,7 +33,8 @@ Dependabot bumps SHA and comment together.
 
 ## Behavior
 
-- Breaking changes (`feat!:` / `BREAKING CHANGE:`) cut a major release, `feat:` a minor.
+- Breaking changes cut a major release — both the `type!:` shorthand and the
+  `BREAKING CHANGE:` footer are recognized. `feat:` cuts a minor.
 - Every other commit type cuts a patch release, except `docs:` and `test:`, which do not
   release.
 - The semantic-release configuration is bundled inside the workflow — callers carry no

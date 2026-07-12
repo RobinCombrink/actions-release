@@ -29,6 +29,7 @@ jobs:
             "branches": ["main"],
             "plugins": [
               ["@semantic-release/commit-analyzer", {
+                "preset": "conventionalcommits",
                 "releaseRules": [
                   { "breaking": true, "release": "major" },
                   { "type": "feat", "release": "minor" },
@@ -44,7 +45,9 @@ jobs:
                   { "type": "revert", "release": "patch" }
                 ]
               }],
-              "@semantic-release/release-notes-generator",
+              ["@semantic-release/release-notes-generator", {
+                "preset": "conventionalcommits"
+              }],
               ["@semantic-release/github", {
                 "successComment": false,
                 "failComment": false,
@@ -57,4 +60,6 @@ jobs:
       - name: Run semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes semantic-release@25.0.6
+        # conventionalcommits preset: recognizes the `type!:` breaking-change shorthand,
+        # which the default angular preset does not
+        run: npx --yes -p conventional-changelog-conventionalcommits@9.3.1 -p semantic-release@25.0.6 semantic-release
