@@ -31,6 +31,32 @@ jobs:
 Pin the exact commit SHA of the release you want (the `# vX.Y.Z` comment keeps it readable);
 Dependabot bumps SHA and comment together.
 
+### Attaching build artifacts
+
+Pass `artifact_name` to attach a build artifact to the release. The artifact must be uploaded
+by an earlier job **in the same workflow run**, so the release job lives in the workflow that
+builds it rather than in a standalone `release.yml`:
+
+```yaml
+jobs:
+  build:
+    # ... produces the binaries, then:
+    #   - uses: actions/upload-artifact@<sha>
+    #     with:
+    #       name: release-binaries
+
+  release:
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    uses: RobinCombrink/actions-release/.github/workflows/release.yml@<commit-sha> # vX.Y.Z
+    with:
+      artifact_name: release-binaries
+```
+
+The artifact is unpacked into `release-artifacts/` before semantic-release runs. Gating the
+release job behind every validation job is the caller's job — `needs:` is what stops a release
+firing on a build that has not passed its checks.
+
 ## Behavior
 
 - Breaking changes cut a major release — both the `type!:` shorthand and the
@@ -41,6 +67,10 @@ Dependabot bumps SHA and comment together.
   `.releaserc`. Shared policy rides this workflow's version; a caller-local
   `.releaserc*`/`release.config.*` overrides the bundled config if you need to diverge.
 - Release notes are generated from the commit history since the previous tag.
+- `artifact_name` attaches its contents via the bundled config. A caller that overrides the
+  bundled config replaces it wholesale, so it must declare `release-artifacts/**` in its own
+  `@semantic-release/github` assets — the workflow still downloads the artifact, but only the
+  config decides what gets attached.
 
 ## Requirements
 
