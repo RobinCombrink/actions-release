@@ -57,6 +57,34 @@ The artifact is unpacked into `release-artifacts/` before semantic-release runs.
 release job behind every validation job is the caller's job — `needs:` is what stops a release
 firing on a build that has not passed its checks.
 
+### Stamping the version into a build
+
+A build that bakes its version in needs that version before it compiles, which is earlier than
+the release exists. Call the workflow twice: once with `dry_run` to learn the version, then
+normally to cut the release.
+
+```yaml
+jobs:
+  version:
+    uses: RobinCombrink/actions-release/.github/workflows/release.yml@<commit-sha> # vX.Y.Z
+    with:
+      dry_run: true
+
+  build:
+    needs: [version]
+    # stamp ${{ needs.version.outputs.version }} into the build, then upload-artifact
+
+  release:
+    needs: [build]
+    uses: RobinCombrink/actions-release/.github/workflows/release.yml@<commit-sha> # vX.Y.Z
+    with:
+      artifact_name: release-binaries
+```
+
+`dry_run` creates no tag and no release. Both calls read the same release rules, so the version
+the build stamps is the version the release cuts. `version` is empty when the commits since the
+last release do not warrant one — branch on it to skip the build and release jobs.
+
 ## Behavior
 
 - Breaking changes cut a major release — both the `type!:` shorthand and the
@@ -71,6 +99,9 @@ firing on a build that has not passed its checks.
   bundled config replaces it wholesale, so it must declare `release-artifacts/**` in its own
   `@semantic-release/github` assets — the workflow still downloads the artifact, but only the
   config decides what gets attached.
+- Only the plugins bundled with semantic-release are available (`commit-analyzer`,
+  `release-notes-generator`, `github`, `npm`). A caller-local config referencing anything else,
+  such as `@semantic-release/exec` or `@semantic-release/git`, fails to load.
 
 ## Requirements
 

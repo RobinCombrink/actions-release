@@ -12,6 +12,19 @@ on:
         type: string
         required: false
         default: ""
+      dry_run:
+        description: >-
+          Compute the version that would be released without creating a tag or release. Use
+          this to learn the version before a build, so the build can stamp it in.
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      version:
+        description: >-
+          The version released, or under dry_run the version that would be released. Empty
+          when the commits since the last release do not warrant one.
+        value: ${{ jobs.release.outputs.version }}
 
 jobs:
   release:
@@ -19,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ARTIFACT_DIRECTORY: release-artifacts
+    outputs:
+      version: ${{ steps.semantic_release.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,7 +45,7 @@ jobs:
           node-version: lts/*
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        if: inputs.artifact_name != ''
+        if: inputs.artifact_name != '' && !inputs.dry_run
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ env.ARTIFACT_DIRECTORY }}
@@ -87,8 +102,27 @@ jobs:
           fi
 
       - name: Run semantic-release
+        id: semantic_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         # conventionalcommits preset: recognizes the `type!:` breaking-change shorthand,
         # which the default angular preset does not
-        run: npx --yes -p conventional-changelog-conventionalcommits@9.3.1 -p semantic-release@25.0.6 semantic-release
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/semantic-release.log"
+          dry_run_flag=""
+          if [ "$DRY_RUN" = "true" ]; then
+            dry_run_flag="--dry-run"
+          fi
+          npx --yes -p conventional-changelog-conventionalcommits@9.3.1 -p semantic-release@25.0.6 semantic-release $dry_run_flag 2>&1 | tee "$log"
+          if grep -qF "no new version is released" "$log"; then
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=$(sed -n 's/.*Published release \([^ ]*\) on .*/\1/p' "$log" | tail -n1)
+          if [ -z "$version" ]; then
+            echo "Could not determine the released version from semantic-release output." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
